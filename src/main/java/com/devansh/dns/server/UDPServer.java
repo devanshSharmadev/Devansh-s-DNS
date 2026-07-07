@@ -1,38 +1,86 @@
 package com.devansh.dns.server;
 
-import com.devansh.dns.packet.DNSHeader;
 import com.devansh.dns.parser.DNSParser;
+import com.devansh.dns.protocol.DNSPacket;
+import com.devansh.dns.protocol.DNSQuestion;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.nio.ByteBuffer;
 
 public class UDPServer {
-    public void start() throws Exception{
-        // Port 53 requires administrator/root privileges. So during development we use 8053
-        // It is used to set up network communication using the UDP (User Datagram Protocol).
-        DatagramSocket socket=new DatagramSocket(8053);
-        System.out.println("DNS server started");
-        while(true){
-            byte[] buffer=new byte[512];
-            DatagramPacket packet=new DatagramPacket(buffer,buffer.length);
-            socket.receive(packet);
-            DNSParser parser = new DNSParser();
-            DNSHeader header = parser.parseHeader(buffer);
-            System.out.println("Transaction ID : " +
-                    Integer.toHexString(header.getTransactionId() & 0xFFFF));
 
-            System.out.println("Flags          : " +
-                    Integer.toHexString(header.getFlags() & 0xFFFF));
+    private static final int PORT = 8053;
+    private static final int BUFFER_SIZE = 512;
 
-            System.out.println("Questions      : " +
-                    header.getQuestionCount());
+    private final DNSParser parser = new DNSParser();
 
-            System.out.println("Received "+packet.getLength()+" bytes");
+    public void start() throws Exception {
 
-            for (int i = 0; i < packet.getLength(); i++) {
-                System.out.printf("%02X ", buffer[i]);
+        try (DatagramSocket socket = new DatagramSocket(PORT)) {
+
+            System.out.println("====================================");
+            System.out.println(" DNS Server Started");
+            System.out.println(" Listening on UDP Port : " + PORT);
+            System.out.println("====================================");
+
+            while (true) {
+
+                byte[] buffer = new byte[BUFFER_SIZE];
+
+                DatagramPacket packet =
+                        new DatagramPacket(buffer, buffer.length);
+
+                socket.receive(packet);
+
+                System.out.println();
+                System.out.println("====================================");
+                System.out.println("Received Request");
+                System.out.println("====================================");
+
+                ByteBuffer byteBuffer =
+                        ByteBuffer.wrap(
+                                packet.getData(),
+                                0,
+                                packet.getLength());
+
+                DNSPacket dnsPacket = parser.parse(byteBuffer);
+
+                printPacketInfo(dnsPacket);
             }
+        }
+    }
 
+    private void printPacketInfo(DNSPacket packet) {
+
+        System.out.println("Transaction ID : "
+                + packet.getHeader().getTransactionId());
+
+        System.out.println("Flags          : "
+                + String.format("0x%04X",
+                packet.getHeader().getFlags()));
+
+        System.out.println("Questions      : "
+                + packet.getHeader().getQuestionCount());
+
+        System.out.println("Answers        : "
+                + packet.getHeader().getAnswerCount());
+
+        System.out.println("Authorities    : "
+                + packet.getHeader().getAuthorityCount());
+
+        System.out.println("Additionals    : "
+                + packet.getHeader().getAdditionalCount());
+
+        System.out.println();
+
+        for (DNSQuestion question : packet.getQuestions()) {
+
+            System.out.println("Question");
+            System.out.println("--------");
+            System.out.println("Domain : " + question.getDomain());
+            System.out.println("Type   : " + question.getType());
+            System.out.println("Class  : " + question.getDnsClass());
             System.out.println();
         }
     }
