@@ -1,5 +1,6 @@
 package com.devansh.dns.resolver;
 
+import com.devansh.dns.client.UpstreamDNSClient;
 import com.devansh.dns.protocol.*;
 import com.devansh.dns.zone.Zone;
 import com.devansh.dns.zone.ZoneLoader;
@@ -8,19 +9,51 @@ import com.devansh.dns.zone.ZoneRepository;
 
 import java.io.IOException;
 
-public class StaticDNSResolver implements DNSResolver {
+public class ForwardingDNSResolver implements DNSResolver{
+    private final ZoneRepository repository;
+    private final UpstreamDNSClient upstreamClient;
 
-    private static final String DEFAULT_IP = "192.168.1.100";
-    private static final long DEFAULT_TTL = 300;
-    private final ZoneRepository zoneRepository;
+    public ForwardingDNSResolver() {
 
-    public StaticDNSResolver(){
-        Zone zone=new ZoneLoader().load();
-        zoneRepository=new ZoneRepository(zone);
+        Zone zone = new ZoneLoader().load();
+
+        repository = new ZoneRepository(zone);
+
+        upstreamClient = new UpstreamDNSClient();
     }
 
     @Override
     public DNSPacket resolve(DNSPacket request) throws IOException {
+
+        if (canResolveLocally(request)) {
+
+            System.out.println("Resolved from local zone.");
+
+            return resolveLocally(request);
+        }
+
+        System.out.println("Forwarding request to upstream DNS...");
+
+        return upstreamClient.resolve(request);
+    }
+
+    private boolean canResolveLocally(DNSPacket request) {
+
+        for (DNSQuestion question : request.getQuestions()) {
+
+            ZoneRecord record = repository.find(
+                    question.getDomain(),
+                    question.getType());
+
+            if (record == null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private DNSPacket resolveLocally(DNSPacket request) {
 
         DNSPacket response = new DNSPacket();
 
@@ -33,7 +66,7 @@ public class StaticDNSResolver implements DNSResolver {
         for (DNSQuestion question : request.getQuestions()) {
 
             ZoneRecord zoneRecord =
-                    zoneRepository.find(
+                    repository.find(
                             question.getDomain(),
                             question.getType());
 
@@ -45,6 +78,10 @@ public class StaticDNSResolver implements DNSResolver {
         }
 
         header.setAnswerCount(response.getAnswers().size());
+
+        if (response.getAnswers().isEmpty()) {
+            return null;
+        }
 
         return response;
     }
@@ -59,7 +96,7 @@ public class StaticDNSResolver implements DNSResolver {
 
         header.setQuestionCount(requestHeader.getQuestionCount());
 
-        header.setAnswerCount(requestHeader.getQuestionCount());
+        header.setAnswerCount(0);
 
         header.setAuthorityCount(0);
 
@@ -84,6 +121,4 @@ public class StaticDNSResolver implements DNSResolver {
 
         return record;
     }
-
-
 }

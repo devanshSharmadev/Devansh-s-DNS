@@ -5,6 +5,7 @@ import com.devansh.dns.parser.DNSWriter;
 import com.devansh.dns.protocol.DNSPacket;
 import com.devansh.dns.protocol.DNSQuestion;
 import com.devansh.dns.resolver.DNSResolver;
+import com.devansh.dns.resolver.ForwardingDNSResolver;
 import com.devansh.dns.resolver.StaticDNSResolver;
 
 import java.net.DatagramPacket;
@@ -18,7 +19,8 @@ public class UDPServer {
 
     private final DNSParser parser = new DNSParser();
     private final DNSWriter writer = new DNSWriter();
-    private final DNSResolver resolver = new StaticDNSResolver();
+    private final DNSResolver resolver =
+            new ForwardingDNSResolver();
 
     public void start() throws Exception {
 
