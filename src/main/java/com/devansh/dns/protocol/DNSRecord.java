@@ -10,7 +10,7 @@ public class DNSRecord {
 
     private long ttl;
 
-    private byte[] data;
+    private String value;
 
     public String getName() {
         return name;
@@ -44,11 +44,11 @@ public class DNSRecord {
         this.ttl = ttl;
     }
 
-    public byte[] getData() {
-        return data;
+    public String getValue() {
+        return value;
     }
 
-    public void setData(byte[] data) {
-        this.data = data;
+    public void setValue(String value) {
+        this.value = value;
     }
 }

@@ -1,8 +1,11 @@
 package com.devansh.dns.server;
 
 import com.devansh.dns.parser.DNSParser;
+import com.devansh.dns.parser.DNSWriter;
 import com.devansh.dns.protocol.DNSPacket;
 import com.devansh.dns.protocol.DNSQuestion;
+import com.devansh.dns.resolver.DNSResolver;
+import com.devansh.dns.resolver.StaticDNSResolver;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -14,6 +17,8 @@ public class UDPServer {
     private static final int BUFFER_SIZE = 512;
 
     private final DNSParser parser = new DNSParser();
+    private final DNSWriter writer = new DNSWriter();
+    private final DNSResolver resolver = new StaticDNSResolver();
 
     public void start() throws Exception {
 
@@ -38,15 +43,34 @@ public class UDPServer {
                 System.out.println("Received Request");
                 System.out.println("====================================");
 
-                ByteBuffer byteBuffer =
-                        ByteBuffer.wrap(
-                                packet.getData(),
-                                0,
-                                packet.getLength());
+                ByteBuffer byteBuffer = ByteBuffer.wrap(
+                        packet.getData(),
+                        0,
+                        packet.getLength());
 
-                DNSPacket dnsPacket = parser.parse(byteBuffer);
+                // Parse DNS Request
+                DNSPacket request = parser.parse(byteBuffer);
 
-                printPacketInfo(dnsPacket);
+                printPacketInfo(request);
+
+                // Resolve DNS Request
+                DNSPacket response = resolver.resolve(request);
+
+                // Serialize Response
+                byte[] responseBytes = writer.write(response);
+
+                // Send Response
+                DatagramPacket responsePacket = new DatagramPacket(
+                        responseBytes,
+                        responseBytes.length,
+                        packet.getAddress(),
+                        packet.getPort()
+                );
+
+                socket.send(responsePacket);
+
+                System.out.println("Response Sent");
+                System.out.println("====================================");
             }
         }
     }
