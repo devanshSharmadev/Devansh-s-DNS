@@ -1,5 +1,7 @@
 package com.devansh.dns.resolver;
 
+import com.devansh.dns.cache.CacheKey;
+import com.devansh.dns.cache.DNSCache;
 import com.devansh.dns.client.UpstreamDNSClient;
 import com.devansh.dns.protocol.*;
 import com.devansh.dns.zone.Zone;
@@ -12,6 +14,7 @@ import java.io.IOException;
 public class ForwardingDNSResolver implements DNSResolver{
     private final ZoneRepository repository;
     private final UpstreamDNSClient upstreamClient;
+    private final DNSCache cache;
 
     public ForwardingDNSResolver() {
 
@@ -20,21 +23,43 @@ public class ForwardingDNSResolver implements DNSResolver{
         repository = new ZoneRepository(zone);
 
         upstreamClient = new UpstreamDNSClient();
+
+        cache = new DNSCache();
     }
 
     @Override
     public DNSPacket resolve(DNSPacket request) throws IOException {
 
+        // 1. Local Zone
         if (canResolveLocally(request)) {
 
-            System.out.println("Resolved from local zone.");
+            System.out.println("Resolved from Local Zone.");
 
             return resolveLocally(request);
         }
 
+        DNSQuestion question = request.getQuestions().get(0);
+
+        CacheKey key = createCacheKey(question);
+
+        // 2. Cache
+        DNSPacket cachedResponse = cache.get(key);
+
+        if (cachedResponse != null) {
+
+            System.out.println("Resolved from Cache.");
+
+            return cachedResponse;
+        }
+
+        // 3. Upstream DNS
         System.out.println("Forwarding request to upstream DNS...");
 
-        return upstreamClient.resolve(request);
+        DNSPacket response = upstreamClient.resolve(request);
+
+        cacheResponse(key, response);
+
+        return response;
     }
 
     private boolean canResolveLocally(DNSPacket request) {
@@ -121,4 +146,28 @@ public class ForwardingDNSResolver implements DNSResolver{
 
         return record;
     }
+
+    private CacheKey createCacheKey(DNSQuestion question) {
+
+        return new CacheKey(
+                question.getDomain(),
+                question.getType());
+    }
+
+    private void cacheResponse(CacheKey key,
+                               DNSPacket response) {
+
+        if (response.getAnswers().isEmpty()) {
+            return;
+        }
+
+        long ttl = response
+                .getAnswers()
+                .get(0)
+                .getTtl();
+
+        cache.put(key, response, ttl);
+    }
+
+
 }
