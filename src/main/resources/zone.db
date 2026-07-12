@@ -1,0 +1,7 @@
+# Domain TTL Type Value
+
+google.com 300 A 142.250.183.206
+facebook.com 300 A 157.240.22.35
+github.com 300 A 140.82.121.4
+openai.com 300 A 104.18.33.45
+localhost 60 A 127.0.0.1

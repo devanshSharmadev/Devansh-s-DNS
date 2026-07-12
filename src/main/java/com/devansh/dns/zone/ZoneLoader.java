@@ -2,47 +2,95 @@ package com.devansh.dns.zone;
 
 import com.devansh.dns.protocol.RecordType;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
 public class ZoneLoader {
+
+    private static final String ZONE_FILE = "zone.db";
 
     public Zone load() {
 
         Zone zone = new Zone();
 
-        zone.addRecord(
-                new ZoneRecord(
-                        "google.com",
-                        RecordType.A,
-                        "142.250.183.206",
-                        300));
+        InputStream inputStream = getClass()
+                .getClassLoader()
+                .getResourceAsStream(ZONE_FILE);
 
-        zone.addRecord(
-                new ZoneRecord(
-                        "facebook.com",
-                        RecordType.A,
-                        "157.240.22.35",
-                        300));
+        if (inputStream == null) {
+            throw new IllegalStateException(
+                    "Zone file not found: " + ZONE_FILE);
+        }
 
-        zone.addRecord(
-                new ZoneRecord(
-                        "github.com",
-                        RecordType.A,
-                        "140.82.121.4",
-                        300));
+        try (BufferedReader reader =
+                     new BufferedReader(
+                             new InputStreamReader(
+                                     inputStream,
+                                     StandardCharsets.UTF_8))) {
 
-        zone.addRecord(
-                new ZoneRecord(
-                        "openai.com",
-                        RecordType.A,
-                        "104.18.33.45",
-                        300));
+            String line;
+            int lineNumber = 0;
 
-        zone.addRecord(
-                new ZoneRecord(
-                        "localhost",
-                        RecordType.A,
-                        "127.0.0.1",
-                        300));
+            while ((line = reader.readLine()) != null) {
+
+                lineNumber++;
+
+                line = line.trim();
+
+                // Ignore blank lines
+                if (line.isEmpty()) {
+                    continue;
+                }
+
+                // Ignore comments
+                if (line.startsWith("#")) {
+                    continue;
+                }
+
+                ZoneRecord record = parseRecord(line, lineNumber);
+
+                zone.addRecord(record);
+            }
+
+        } catch (IOException e) {
+
+            throw new RuntimeException(
+                    "Unable to read zone file.", e);
+        }
 
         return zone;
+    }
+
+    private ZoneRecord parseRecord(String line,
+                                   int lineNumber) {
+
+        String[] tokens = line.split("\\s+");
+
+        if (tokens.length != 4) {
+
+            throw new IllegalArgumentException(
+                    "Invalid zone record at line "
+                            + lineNumber
+                            + ": "
+                            + line);
+        }
+
+        String domain = tokens[0];
+
+        long ttl = Long.parseLong(tokens[1]);
+
+        RecordType type = RecordType.valueOf(tokens[2]);
+
+        String value = tokens[3];
+
+        return new ZoneRecord(
+                domain,
+                type,
+                value,
+                ttl
+        );
     }
 }
